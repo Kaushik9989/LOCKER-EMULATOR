@@ -42,7 +42,7 @@ const Parcel2 = require("./models/parcel2Updated.js");
 const User = require("./models/User/UserUpdated.js");
 const Courier = require("./models/Courier.js");
 const Parcel = require("./models/Parcel");
-const incomingParcel = require('./models/incomingParcel.js');
+
 const app = express();
 const PORT = 8080;
 const Razorpay = require("razorpay");
@@ -60,7 +60,8 @@ const locker = require("./models/locker.js");
 const compression = require("compression");
 app.use(compression());
 require("dotenv").config();
-
+const server = http.createServer(app);
+const io = new Server(server);
 
 // Set up a cache for rendered HTML
 
@@ -286,7 +287,6 @@ app.post("/api/locker/scan", async (req, res) => {
 
   // Find the parcel by accessCode
   const parcel = await Parcel2.findOne({ accessCode });
-  const parcelU = await incomingParcel.findOne({accessCode});
   if (!parcel) {
     return res
       .status(404)
@@ -346,12 +346,7 @@ app.post("/api/locker/scan", async (req, res) => {
   await parcel.save();
 
   // Update any secondary parcel collection if needed
-  if (parcelU) {
-    parcelU.lockerLat = locker.location.lat;
-    parcelU.lockerLng = locker.location.lng;
-    await parcelU.save();
-  }
-
+ 
   io.emit("parcelUpdated", {
     parcelId: parcel._id,
     status: parcel.status,
@@ -925,6 +920,6 @@ app.use((err, req, res, next) => {
   });
 });
 
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
 });
