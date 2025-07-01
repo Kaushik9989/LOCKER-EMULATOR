@@ -258,7 +258,7 @@ app.get("/",(req,res)=>{
 })
 
 
-app.get("/locker/emulator/:lockerId", isAuthenticated, async (req, res) => {
+app.get("/locker/emulator/:lockerId", async (req, res) => {
   try {
     const locker = await Locker.findOne({ lockerId: req.params.lockerId });
     
@@ -470,7 +470,7 @@ app.post("/api/locker/scan", async (req, res) => {
 
 
 
-app.get("/locker/emulator/:lockerId", isAuthenticated, async (req, res) => {
+app.get("/locker/emulator/:lockerId", async (req, res) => {
   try {
     const locker = await Locker.findOne({ lockerId: req.params.lockerId });
     if (!locker) return res.status(404).json({ message: "Locker not found" });
