@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Locker Emulator</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    body {
+      background: #f8f9fb;
+      font-family: "Inter", sans-serif;
+    }
+    .station-card {
+      background: #e9ecef;
+      border-radius: 0.75rem;
+      min-height: 100px;
+    }
+    .cta-card {
+      background: #eef3fc;
+      border: 1px solid #dbe6f9;
+      border-radius: 0.75rem;
+      text-align: center;
+      padding: 2rem 1rem;
+    }
+    .cta-button {
+      background: #000;
+      color: #fff;
+      font-weight: 500;
+      border: none;
+      padding: 0.75rem 1.5rem;
+      border-radius: 0.5rem;
+      transition: all 0.2s ease;
+    }
+    .cta-button:hover {
+      background: #333;
+    }
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      background: #2ecc71;
+      border-radius: 50%;
+      display: inline-block;
+    }
+    .locker-info {
+      font-size: 0.9rem;
+      color: #6c757d;
+    }
+    .version-badge {
+      font-size: 0.8rem;
+      background: #e9ecef;
+      border-radius: 0.5rem;
+      padding: 0.25rem 0.5rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container py-4">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
+      <div>
+        <h5 class="mb-1">Welcome to Drop Point</h5>
+        <small class="text-muted">Smart Locker System</small>
+      </div>
+      <div>
+        <span class="version-badge">v2.1.3</span>
+        <i class="bi bi-wifi ms-2"></i>
+      </div>
+    </div>
+    <h4>Your Nearest Locker</h4>
+    <!-- Station Info -->
+    <div id="station-card" class="station-card p-3 d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
+      <div>
+        <strong><i class="bi bi-geo-alt me-1"></i> <span id="station-name">Detecting...</span></strong><br>
+        <small id="station-address">Fetching nearest locker...</small><br>
+        <small>Lockers: <span id="total-lockers">—</span></small>
+      </div>
+      <div class="text-end">
+        <small>Locker ID: <strong id="station-id">—</strong></small>
+        <span class="status-dot"></span>
+        <small class="ms-1">Online</small>
+        
+      </div>
+      <button class="cta-button">
+        <i class="bi bi-lightning-fill me-1"></i>
+        <a id="locker-link" style="text-decoration: none;" href="#">Open QR Scanner Interface</a>
+
+      </button>
+    </div>
+
+    <!-- Call To Action -->
+    <div class="cta-card mx-auto" style="max-width:500px;">
+      <div class="mb-3">
+        <i class="bi bi-qr-code-scan fs-1 text-primary"></i>
+      </div>
+      <h6 class="mb-2">Start Locker Operation</h6>
+      <p class="mb-3 text-muted">Show your QR code to the camera for instant access</p>
+      
+      <p class="locker-info mt-3">Supports pickup, drop-off, and purchases</p>
+      <div class="mt-4">
+  <input
+    type="text"
+    id="manual-locker-id"
+    class="form-control mb-2"
+    placeholder="Enter Locker ID"
+  />
+  <button class="cta-button w-100" id="manual-open-btn">
+    <i class="bi bi-box-arrow-in-right me-1"></i>
+    Open Locker Emulator
+  </button>
+</div>
+
+    </div>
+  </div>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const stationNameEl = document.getElementById("station-name");
+      const stationAddressEl = document.getElementById("station-address");
+      const totalLockersEl = document.getElementById("total-lockers");
+      const stationIdEl = document.getElementById("station-id");
+
+      // Attempt geolocation
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            const { latitude, longitude } = position.coords;
+
+            // POST to your API
+            fetch("/api/nearest-locker", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ latitude, longitude })
+            })
+              .then(res => res.json())
+              .then(data => {
+                if (data.success && data.locker) {
+                  stationNameEl.textContent = data.locker.address || "Nearest Locker";
+                  stationAddressEl.textContent = `Lat: ${data.locker.coordinates.lat.toFixed(5)}, Lng: ${data.locker.coordinates.lng.toFixed(5)}`;
+                  totalLockersEl.textContent = `${data.locker.availableCompartments}/${data.locker.totalCompartments}`;
+                  stationIdEl.textContent = data.locker.lockerId;
+                   const lockerLinkEl = document.getElementById("locker-link");
+lockerLinkEl.href = `/locker/emulator/${data.locker.lockerId}`;
+lockerLinkEl.classList.remove("disabled");
+                } else {
+                  stationNameEl.textContent = "No locker found";
+                  stationAddressEl.textContent = data.message || "No lockers nearby.";
+                }
+              })
+              .catch(err => {
+                console.error(err);
+                stationNameEl.textContent = "Error";
+                stationAddressEl.textContent = "Could not fetch locker data.";
+              });
+          },
+          (error) => {
+            console.error(error);
+            stationNameEl.textContent = "Location error";
+            stationAddressEl.textContent = "Please allow location access.";
+          }
+        );
+      } else {
+        stationNameEl.textContent = "Unsupported";
+        stationAddressEl.textContent = "Geolocation not available.";
+      }
+    });
+   // Manual locker ID handling
+const manualInput = document.getElementById("manual-locker-id");
+const manualButton = document.getElementById("manual-open-btn");
+
+manualButton.addEventListener("click", () => {
+  const lockerId = manualInput.value.trim();
+  if (!lockerId) {
+    alert("Please enter a Locker ID.");
+    return;
+  }
+  // Navigate to emulator page
+  window.location.href = `/locker/emulator/${lockerId}`;
+});
+
+  </script>
+</body>
+</html>

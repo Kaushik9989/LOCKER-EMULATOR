@@ -1,0 +1,260 @@
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Locker Emulator</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+    <!-- HTML5 QR Code library -->
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    <style>
+        .locker-card {
+            min-height: 80px;
+            cursor: pointer;
+            transition: box-shadow 0.2s;
+        }
+
+        .locker-card:hover {
+            box-shadow: 0 0 0.5rem rgba(0, 0, 0, 0.2);
+        }
+
+        .html5-qrcode-close-button {
+            display: none !important;
+        }
+
+        #qr-reader {
+            border-radius: 0.5rem;
+            overflow: hidden;
+            background-color: #f8f9fa;
+            position: relative;
+        }
+
+        #qr-reader video {
+            width: 100% !important;
+            height: auto !important;
+            border-radius: 0.5rem;
+            object-fit: cover;
+        }
+
+        #qr-status {
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .html5-qrcode-element {
+            outline: none !important;
+        }
+    </style>
+
+</head>
+
+<body class="bg-light">
+    <div class="container-fluid py-3">
+        <!-- Header -->
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <div>
+                <h3 class="mb-0">Smart Locker System</h3>
+                <small class="text-muted">Locker ID: <%= lockerId %></small>
+            </div>
+            <div>
+                <button class="btn btn-dark btn-sm me-1">Secure Mode</button>
+                <button class="btn btn-dark btn-sm me-1">Camera Active</button>
+                <button class="btn btn-dark btn-sm">Scanning</button>
+            </div>
+        </div>
+
+        <div class="row g-3">
+            <!-- Left Column: QR Scanner + Status -->
+            <div class="col-lg-4">
+                <div class="card mb-3 shadow-sm">
+                    <div class="card-header d-flex align-items-center">
+                        <i class="bi bi-qr-code-scan me-2"></i> QR Scanner
+                    </div>
+                    <div class="card-body">
+                        <div id="qr-reader" class="border border-secondary rounded bg-light" style="height: 350px;">
+                        </div>
+                        <div id="qr-status" class="mt-2 text-muted small">Initializing scanner...</div>
+                        <div class="mt-3 alert alert-success py-2 mb-0 d-flex align-items-center">
+                            <i class="bi bi-shield-lock-fill me-2"></i>
+                            <small class="mb-0">Secure Mode: QR Authentication Required</small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card bg-dark text-white mb-3 shadow-sm">
+                    <div class="card-body d-flex flex-column align-items-center py-3">
+                        <i class="bi bi-lock-fill fs-3 mb-2"></i>
+                        <div class="text-center">
+                            <small class="d-block">Secure System Ready</small>
+                            <small class="d-block">Present valid QR code</small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card shadow-sm">
+                    <div class="card-header d-flex align-items-center">
+                        <i class="bi bi-info-circle me-2"></i> Session Status
+                    </div>
+                    <div class="card-body small">
+                        <div class="d-flex justify-content-between mb-2">
+                            <span><strong>Security:</strong></span>
+                            <span class="badge bg-primary">Protected</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span><strong>Scanner:</strong></span>
+                            <span class="badge bg-success">Active</span>
+                        </div>
+                        <div class="d-flex justify-content-between">
+                            <span><strong>Last Auth:</strong></span>
+                            <span class="text-muted">None</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Column: Stats + Locker Grid -->
+            <div class="col-lg-8">
+                <!-- Stats -->
+                <div class="row g-2 mb-3">
+                    <div class="col-6 col-md-3">
+                        <div class="card text-center">
+                            <div class="card-body py-2">
+                                <small>Available</small>
+                                <div class="fs-5 text-success fw-bold">
+                                    <%= compartments.filter(c=> !c.isBooked).length %>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="card text-center">
+                            <div class="card-body py-2">
+                                <small>Occupied</small>
+                                <div class="fs-5 text-danger fw-bold">
+                                    <%= compartments.filter(c=> c.isBooked).length %>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="card text-center">
+                            <div class="card-body py-2">
+                                <small>Active</small>
+                                <div class="fs-5 text-primary fw-bold">
+                                    <%= compartments.length %>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="card text-center">
+                            <div class="card-body py-2">
+                                <small>Issues</small>
+                                <div class="fs-5 text-warning fw-bold">0</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Locker Grid -->
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between">
+                        <span>Secure Locker Bank</span>
+                        <small class="text-muted">🔒 QR-Protected</small>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-2">
+                            <% compartments.forEach(c=> { %>
+                                <div class="col-6 col-md-4 col-lg-3">
+                                    <div class="border rounded text-center py-2 locker-card 
+                    <% if (c.isBooked) { %> border-danger <% } else { %> border-success <% } %>">
+                                        <div><strong>
+                                                <%= c.compartmentId %>
+                                            </strong></div>
+                                        <small class="<%= c.isBooked ? 'text-danger' : 'text-success' %>">
+                                            <%= c.isBooked ? 'Busy' : 'Available' %>
+                                        </small>
+                                    </div>
+                                </div>
+                                <% }) %>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-2 small text-muted">
+                    <strong>Security Notice:</strong> All locker access requires QR authentication.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            const lockerId = "<%= lockerId %>";
+            const statusEl = document.getElementById("qr-status");
+
+            // Create the built‑in scanner UI
+            const scanner = new Html5QrcodeScanner(
+                "qr-reader",
+                { fps: 10, qrbox: 200 },
+      /* verbose= */ false
+            );
+
+            // On successful scan:
+            function onScanSuccess(decodedText) {
+                // immediately stop the camera UI
+                scanner.clear().then(() => {
+                    statusEl.textContent = "Processing QR code…";
+                    statusEl.className = "mt-2 small text-primary";
+
+                    let accessCode;
+                    try {
+                        accessCode = JSON.parse(decodedText).accessCode;
+                        if (!accessCode) throw new Error("Missing accessCode");
+                    } catch (e) {
+                        return handleError("Invalid QR format");
+                    }
+
+                    // send to your API
+                    fetch("/api/locker/scan", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ accessCode, lockerId })
+                    })
+                        .then(r => r.json())
+                        .then(json => {
+                            if (json.success) {
+                                statusEl.textContent = `✅ ${json.message} (Compartment ${json.compartmentId})`;
+                                statusEl.className = "mt-2 small text-success";
+                                setTimeout(() => location.reload(), 1500);
+                            } else {
+                                handleError(json.message || "Server rejected QR");
+                            }
+                        })
+                        .catch(() => handleError("Network error"));
+                });
+            }
+
+            // On scan failure or after an error
+            function handleError(msg) {
+                statusEl.textContent = `❌ ${msg} — retrying in 3s…`;
+                statusEl.className = "mt-2 small text-danger";
+                setTimeout(() => {
+                    statusEl.textContent = "Show QR code to scanner";
+                    statusEl.className = "mt-2 small text-muted";
+                    scanner.render(onScanSuccess);
+                }, 3000);
+            }
+
+            // initial render
+            scanner.render(onScanSuccess, /* onScanFailure */() => { });
+            statusEl.textContent = "Scanner ready. Show QR code.";
+            statusEl.className = "mt-2 small text-muted";
+        });
+    </script>
+
+
+</body>
+
+</html>
