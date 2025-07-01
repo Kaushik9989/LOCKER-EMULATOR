@@ -356,8 +356,7 @@ app.post("/api/locker/scan", async (req, res) => {
     droppedAt: parcel.droppedAt,
   });
 
-  dashboardCache.delete("dashboard:" + req.session.user._id);
-  parcelCache.delete("sendParcel:" + req.session.user._id);
+  
 
   return res.json({
     success: true,
