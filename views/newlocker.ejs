@@ -9,6 +9,17 @@
     <!-- HTML5 QR Code library -->
     <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
+        .blinking {
+            animation: blinker 1s linear infinite;
+            border-width: 3px !important;
+        }
+
+        @keyframes blinker {
+            50% {
+                border-color: #ffc107;
+            }
+        }
+
         .locker-card {
             min-height: 80px;
             cursor: pointer;
@@ -63,6 +74,49 @@
                 <button class="btn btn-dark btn-sm">Scanning</button>
             </div>
         </div>
+        <!-- Initial Compartment Modal -->
+        <!-- Compartment Modal -->
+        <div class="modal fade" id="compartmentModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered modal-lg">
+                <div class="modal-content text-center">
+                    <div class="modal-header border-0">
+                        <h5 class="modal-title w-100">
+                            <i class="bi bi-box-seam-fill me-2 text-success"></i> Drop-off Location Ready
+                        </h5>
+                    </div>
+                    <div class="modal-body">
+                        <p class="text-muted mb-3">
+                            Locker prepared for <strong id="packageType">medium package</strong>
+                        </p>
+
+                        <div class="p-3 border rounded mb-3 position-relative bg-light">
+                            <div class="small mb-1">
+                                <i class="bi bi-geo-alt-fill"></i> Go to Locker
+                            </div>
+                            <h1 id="compartmentLabel" class="display-4 fw-bold mb-0">L23</h1>
+
+                            <!-- Countdown Badge -->
+                            <div class="position-absolute top-0 end-0 m-2 badge bg-danger" id="countdownBadge">
+                                5s
+                            </div>
+                            <div class="small mt-2 text-muted">
+                                Opening automatically in <span id="countdownText">5</span> seconds
+                            </div>
+                        </div>
+
+                        <!-- Progress Bar -->
+                        <div class="progress mb-3" style="height: 6px;">
+                            <div id="progressBar" class="progress-bar bg-primary" style="width:0%;"></div>
+                        </div>
+
+                        <div class="alert alert-info small mb-0">
+                            Auto-opening in progress...
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
 
         <div class="row g-3">
             <!-- Left Column: QR Scanner + Status -->
@@ -169,6 +223,9 @@
                                 <div class="col-6 col-md-4 col-lg-3">
                                     <div class="border rounded text-center py-2 locker-card 
                     <% if (c.isBooked) { %> border-danger <% } else { %> border-success <% } %>">
+                                        <div class="locker-icon">
+                                            <i class="bi bi-lock-fill"></i>
+                                        </div>
                                         <div><strong>
                                                 <%= c.compartmentId %>
                                             </strong></div>
@@ -181,6 +238,19 @@
                         </div>
                     </div>
                 </div>
+                <!-- Bottom Banner Steps -->
+                <div id="bottomSteps" class="fixed-bottom bg-success text-white p-3 d-none">
+                    <div class="container d-flex justify-content-between align-items-center">
+                        <div>
+                            <i class="bi bi-unlock-fill me-2"></i>
+                            <strong id="stepTitle">Step 1 of 2:</strong>
+                            <span id="stepText">Place your parcel in the open locker.</span>
+                        </div>
+                        <button id="confirmButton" class="btn btn-light text-success fw-bold">
+                            <i class="bi bi-check2-circle me-1"></i> Confirm
+                        </button>
+                    </div>
+                </div>
 
                 <div class="mt-2 small text-muted">
                     <strong>Security Notice:</strong> All locker access requires QR authentication.
@@ -188,22 +258,20 @@
             </div>
         </div>
     </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
     <script>
         document.addEventListener("DOMContentLoaded", () => {
             const lockerId = "<%= lockerId %>";
             const statusEl = document.getElementById("qr-status");
 
-            // Create the built‑in scanner UI
             const scanner = new Html5QrcodeScanner(
                 "qr-reader",
                 { fps: 10, qrbox: 200 },
-      /* verbose= */ false
+                false
             );
 
-            // On successful scan:
             function onScanSuccess(decodedText) {
-                // immediately stop the camera UI
                 scanner.clear().then(() => {
                     statusEl.textContent = "Processing QR code…";
                     statusEl.className = "mt-2 small text-primary";
@@ -216,18 +284,18 @@
                         return handleError("Invalid QR format");
                     }
 
-                    // send to your API
                     fetch("/api/locker/scan", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ accessCode, lockerId })
+                        body: JSON.stringify({ accessCode, lockerId,status })
                     })
                         .then(r => r.json())
                         .then(json => {
                             if (json.success) {
-                                statusEl.textContent = `✅ ${json.message} (Compartment ${json.compartmentId})`;
-                                statusEl.className = "mt-2 small text-success";
-                                setTimeout(() => location.reload(), 1500);
+                                const compartmentId = json.compartmentId;
+                                const packageType = "medium package";
+                               const status = json.status;
+                                showCompartmentFlow(compartmentId, packageType,status);
                             } else {
                                 handleError(json.message || "Server rejected QR");
                             }
@@ -236,7 +304,6 @@
                 });
             }
 
-            // On scan failure or after an error
             function handleError(msg) {
                 statusEl.textContent = `❌ ${msg} — retrying in 3s…`;
                 statusEl.className = "mt-2 small text-danger";
@@ -247,12 +314,137 @@
                 }, 3000);
             }
 
-            // initial render
-            scanner.render(onScanSuccess, /* onScanFailure */() => { });
+            scanner.render(onScanSuccess, () => { });
             statusEl.textContent = "Scanner ready. Show QR code.";
             statusEl.className = "mt-2 small text-muted";
         });
+
+        function showCompartmentFlow(compartmentId, packageType, status = 'awaiting_drop') {
+            const modalTitle = document.querySelector('#compartmentModal .modal-title');
+            const modalBodyText = document.querySelector('#compartmentModal .modal-body p');
+            const countdownText = document.getElementById('countdownText');
+            const countdownBadge = document.getElementById('countdownBadge');
+            const progressBar = document.getElementById('progressBar');
+
+            document.getElementById('compartmentLabel').textContent = compartmentId;
+            document.getElementById('packageType').textContent = packageType;
+            countdownText.textContent = '5';
+            countdownBadge.textContent = '5s';
+            progressBar.style.width = '0%';
+
+            // Update modal text based on status
+            if (status === 'awaiting_pick') {
+                modalTitle.innerHTML = `<i class="bi bi-box-arrow-in-down me-2 text-success"></i> Pick-up Location Ready`;
+                modalBodyText.innerHTML = `Locker prepared for <strong>${packageType}</strong>.`;
+                document.querySelector('.alert-info').textContent = "Auto-unlocking for retrieval...";
+            } else {
+                modalTitle.innerHTML = `<i class="bi bi-box-seam-fill me-2 text-success"></i> Drop-off Location Ready`;
+                modalBodyText.innerHTML = `Locker prepared for <strong>${packageType}</strong>.`;
+                document.querySelector('.alert-info').textContent = "Auto-opening in progress...";
+            }
+
+            const modal = new bootstrap.Modal(document.getElementById('compartmentModal'));
+            modal.show();
+
+            // Highlight and swap icon
+            const lockerCards = document.querySelectorAll('.locker-card');
+            lockerCards.forEach(card => {
+                if (card.querySelector('strong').textContent.trim() === compartmentId) {
+                    card.classList.add('blinking');
+                    let iconEl = card.querySelector('.locker-icon');
+                    if (!iconEl) {
+                        iconEl = document.createElement('div');
+                        iconEl.className = 'locker-icon';
+                        card.insertBefore(iconEl, card.children[1]);
+                    }
+                    iconEl.innerHTML = `<i class="bi bi-door-open-fill text-primary"></i>`;
+                }
+            });
+
+            let totalDuration = 5000;
+            let startTime = Date.now();
+
+            const countdownInterval = setInterval(() => {
+                let elapsed = Date.now() - startTime;
+                let remaining = Math.max(0, totalDuration - elapsed);
+                let pct = ((elapsed / totalDuration) * 100).toFixed(1);
+
+                progressBar.style.width = `${pct}%`;
+
+                let newSeconds = Math.ceil(remaining / 1000);
+                countdownText.textContent = newSeconds;
+                countdownBadge.textContent = `${newSeconds}s`;
+
+                if (remaining <= 0) {
+                    clearInterval(countdownInterval);
+                    modal.hide();
+                    showStepBanner(compartmentId, status);
+                }
+            }, 100);
+        }
+
+        function showStepBanner(compartmentId, status = 'awaiting_drop') {
+            const banner = document.getElementById('bottomSteps');
+            banner.classList.remove('d-none');
+
+            const stepTitle = document.getElementById('stepTitle');
+            const stepText = document.getElementById('stepText');
+            const button = document.getElementById('confirmButton');
+
+            let step = 1;
+
+            if (status === 'awaiting_pick') {
+                // Pick-up flow
+                stepTitle.textContent = `Step 1 of 2:`;
+                stepText.textContent = `Open locker ${compartmentId} and retrieve your parcel.`;
+                button.textContent = 'Parcel Retrieved';
+                button.classList.remove('btn-primary');
+                button.classList.add('btn-light');
+            } else {
+                // Drop-off flow
+                stepTitle.textContent = `Step 1 of 2:`;
+                stepText.textContent = `Place your parcel in locker ${compartmentId}.`;
+                button.textContent = 'Parcel Placed';
+                button.classList.remove('btn-primary');
+                button.classList.add('btn-light');
+            }
+
+            button.onclick = () => {
+                if (step === 1) {
+                    if (status === 'awaiting_pick') {
+                        stepTitle.textContent = `Step 2 of 2:`;
+                        stepText.textContent = `Close the locker door to finish retrieval.`;
+                        button.textContent = 'Close & Secure';
+                    } else {
+                        stepTitle.textContent = `Step 2 of 2:`;
+                        stepText.textContent = `Close the locker door to complete drop-off.`;
+                        button.textContent = 'Close & Secure';
+                    }
+                    step = 2;
+                } else {
+                    banner.classList.add('d-none');
+
+                    // Stop blinking and restore icon
+                    const lockerCards = document.querySelectorAll('.locker-card');
+                    lockerCards.forEach(card => {
+                        if (card.querySelector('strong').textContent.trim() === compartmentId) {
+                            card.classList.remove('blinking');
+                            const iconEl = card.querySelector('.locker-icon');
+                            if (iconEl) {
+                                iconEl.innerHTML = `<i class="bi bi-lock-fill"></i>`;
+                            }
+                        }
+                    });
+
+                    location.reload();
+                }
+            };
+        }
+
+
     </script>
+
+
 
 
 </body>
