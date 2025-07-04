@@ -248,17 +248,20 @@ app.get("/", (req, res) => {
 app.get("/locker/emulator/:lockerId", async (req, res) => {
   try {
     const locker = await Locker.findOne({ lockerId: req.params.lockerId });
-
+    let scannerActive = true;
     if (!locker) {
+      scannerActive = false;
       // Render a "not found" page
       return res.render("lockerNotFound.ejs", {
         lockerId: req.params.lockerId,
       });
     }
+    
     const compartments = locker.compartments;
     const { lockerId } = req.params;
-    res.render("newlocker.ejs", { lockerId, compartments });
+    res.render("newlocker.ejs", { lockerId, compartments, scannerActive});
   } catch (err) {
+    scannerActive = false;
     res.status(500).json({ message: "Server error", error: err });
   }
 });
