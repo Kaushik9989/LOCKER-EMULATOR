@@ -9,6 +9,43 @@
     <!-- HTML5 QR Code library -->
     <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
+        /* Container for the steps inside the locker card */
+        .compartment-steps {
+            background: #f8f9fa;
+            border-top: 1px solid #dee2e6;
+            margin-top: 0.5rem;
+            padding: 0.5rem;
+            border-radius: 0.25rem;
+            animation: fadeIn 0.3s ease-in-out;
+        }
+
+        /* Make the step text subtle but readable */
+        .compartment-steps small {
+            font-size: 0.8rem;
+            color: #555;
+        }
+
+        /* Make the confirm button full width and modern */
+        .compartment-steps button {
+            width: 100%;
+            font-size: 0.85rem;
+            font-weight: 500;
+            margin-top: 0.4rem;
+        }
+
+        /* Simple fade-in animation */
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(5px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
         #lockerScreen {
             background: #000000 radial-gradient(circle at 20% 20%, #111, #000);
             border: 2px solid #333;
@@ -94,7 +131,7 @@
                 <h3 class="mb-0">Smart Locker System</h3>
                 <small class="text-muted">Locker ID: <%= lockerId %></small>
             </div>
-            
+
         </div>
         <!-- Initial Compartment Modal -->
         <!-- Compartment Modal -->
@@ -247,7 +284,7 @@
                                     <div class="border rounded text-center py-2 locker-card 
                     <% if (c.isBooked) { %> border-danger <% } else { %> border-success <% } %>">
                                         <div class="locker-icon">
-                                            <i class="bi bi-lock-fill"></i>
+                                            <i class="bi bi-box"></i> <!-- Outline parcel icon -->
                                         </div>
                                         <div><strong>
                                                 <%= c.compartmentId %>
@@ -262,7 +299,7 @@
                     </div>
                 </div>
                 <!-- Bottom Banner Steps -->
-                <div id="bottomSteps" class="fixed-bottom bg-success text-white p-3 d-none">
+                <!-- <div id="bottomSteps" class="fixed-bottom bg-success text-white p-3 d-none">
                     <div class="container d-flex justify-content-between align-items-center">
                         <div>
                             <i class="bi bi-unlock-fill me-2"></i>
@@ -273,7 +310,7 @@
                             <i class="bi bi-check2-circle me-1"></i> Confirm
                         </button>
                     </div>
-                </div>
+                </div> -->
 
                 <div class="mt-2 small text-muted">
                     <strong>Security Notice:</strong> All locker access requires QR authentication.
@@ -394,7 +431,67 @@
             updateLockerScreen("ready");
             statusEl.textContent = "Scanner ready. Show QR code.";
             statusEl.className = "mt-2 small text-muted";
+
         });
+
+        function showStepInCard(compartmentId, status = 'awaiting_drop') {
+            updateLockerScreen("unlocked");
+
+            const lockerCards = document.querySelectorAll('.locker-card');
+            lockerCards.forEach(card => {
+                if (card.querySelector('strong').textContent.trim() === compartmentId) {
+                    // Clear any previous instructions
+                    const existingStepDiv = card.querySelector('.compartment-steps');
+                    if (existingStepDiv) existingStepDiv.remove();
+
+                    // Create container
+                    const stepDiv = document.createElement('div');
+                    stepDiv.className = 'compartment-steps mt-2';
+
+                    // Step Text
+                    const stepText = document.createElement('small');
+                    stepText.className = 'd-block text-muted';
+                    if (status === 'awaiting_pick') {
+                        stepText.textContent = `Step 1: Retrieve your parcel.`;
+                    } else {
+                        stepText.textContent = `Step 1: Place your parcel.`;
+                    }
+                    stepDiv.appendChild(stepText);
+
+                    // Confirm Button
+                    const button = document.createElement('button');
+                    button.className = 'btn btn-sm btn-outline-primary mt-1';
+                    button.textContent = status === 'awaiting_pick' ? 'Parcel Retrieved' : 'Parcel Placed';
+
+                    let step = 1;
+
+                    button.onclick = () => {
+                        if (step === 1) {
+                            step = 2;
+                            stepText.textContent = `Step 2: Close the locker door.`;
+                            button.textContent = 'Close & Secure';
+                            updateLockerScreen("closing");
+                        } else {
+                            // Finish interaction
+                            card.classList.remove('blinking');
+                            const iconEl = card.querySelector('.locker-icon');
+                            if (iconEl) {
+                                iconEl.innerHTML = `<i class="bi bi-lock-fill"></i>`;
+                            }
+                            updateLockerScreen("completed");
+                            // Remove the step instructions
+                            stepDiv.remove();
+                            setTimeout(() => {
+                                location.reload();
+                            }, 1000);
+                        }
+                    };
+
+                    stepDiv.appendChild(button);
+                    card.appendChild(stepDiv);
+                }
+            });
+        }
 
         function showCompartmentFlow(compartmentId, packageType, status = 'awaiting_drop') {
             const modalTitle = document.querySelector('#compartmentModal .modal-title');
@@ -458,7 +555,7 @@
                 if (remaining <= 0) {
                     clearInterval(countdownInterval);
                     modal.hide();
-                    showStepBanner(compartmentId, status);
+                    showStepInCard(compartmentId, status);
                 }
             }, 100);
         }
@@ -533,7 +630,7 @@
 
         }
 
-        
+
     </script>
 
 
