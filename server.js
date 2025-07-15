@@ -299,17 +299,21 @@ app.post("/api/locker/scan", async (req, res) => {
         message: "Locker ID is required for drop-off.",
       });
     }
-
     // Find that specific locker
     const locker = await Locker.findOne({ lockerId });
-
+    console.log("DEBUG Locker:", locker); 
+    parcel.lockerLat = locker.location.lat;
+    parcel.lockerLng = locker.location.lng;
+console.log("DEBUG Locker Location:", locker.location);
+console.log("DEBUG Locker Lat:", locker.location?.lat, "Lng:", locker.location?.lng);
+    console.log("PARCEL LOCATION", parcel.lockerLat)
     if (!locker) {
       return res.status(404).json({
         success: false,
         message: "Specified locker not found.",
       });
     }
-
+    
     // Look for a free compartment in that locker
     const compartment = locker.compartments.find((c) => !c.isBooked);
 
@@ -324,6 +328,7 @@ app.post("/api/locker/scan", async (req, res) => {
     compartment.isLocked = true;
     compartment.isBooked = true;
     compartment.currentParcelId = parcel._id;
+    
     await locker.save();
 
     // Update parcel

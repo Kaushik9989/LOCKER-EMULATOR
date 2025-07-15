@@ -9,6 +9,8 @@ const ParcelSchema = new mongoose.Schema({
   type: { type: String, enum: ["document", "package", "gift", "other"], required: true },
   size: { type: String, enum: ["small", "medium", "large"], required: true },
   location_id: { type: mongoose.Schema.Types.ObjectId, ref: "DropLocation" },
+  lockerLat : {type : String},
+  lockerLng : {type :String},
   lockerId: { type: String, required: false, default: null },
   compartmentId: { type: String },
   accessCode: { type: String, unique: true, required: true },
