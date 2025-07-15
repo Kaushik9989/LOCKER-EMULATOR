@@ -256,16 +256,18 @@ app.get("/locker/emulator/:lockerId", async (req, res) => {
         lockerId: req.params.lockerId,
       });
     }
-    
+
     const compartments = locker.compartments;
     const { lockerId } = req.params;
-    res.render("newlocker.ejs", { lockerId, compartments, scannerActive});
+    res.render("newlocker.ejs", { lockerId, compartments, scannerActive });
   } catch (err) {
     scannerActive = false;
     res.status(500).json({ message: "Server error", error: err });
   }
 });
+const twilio = require("twilio");
 
+const client = twilio(process.env.TWILIO_SID, process.env.TWILIO_AUTH_TOKEN);
 app.post("/api/locker/scan", async (req, res) => {
   const { accessCode } = req.body;
 
@@ -301,19 +303,24 @@ app.post("/api/locker/scan", async (req, res) => {
     }
     // Find that specific locker
     const locker = await Locker.findOne({ lockerId });
-    console.log("DEBUG Locker:", locker); 
+    console.log("DEBUG Locker:", locker);
     parcel.lockerLat = locker.location.lat;
     parcel.lockerLng = locker.location.lng;
-console.log("DEBUG Locker Location:", locker.location);
-console.log("DEBUG Locker Lat:", locker.location?.lat, "Lng:", locker.location?.lng);
-    console.log("PARCEL LOCATION", parcel.lockerLat)
+    console.log("DEBUG Locker Location:", locker.location);
+    console.log(
+      "DEBUG Locker Lat:",
+      locker.location?.lat,
+      "Lng:",
+      locker.location?.lng
+    );
+    console.log("PARCEL LOCATION", parcel.lockerLat);
     if (!locker) {
       return res.status(404).json({
         success: false,
         message: "Specified locker not found.",
       });
     }
-    
+
     // Look for a free compartment in that locker
     const compartment = locker.compartments.find((c) => !c.isBooked);
 
@@ -328,7 +335,7 @@ console.log("DEBUG Locker Lat:", locker.location?.lat, "Lng:", locker.location?.
     compartment.isLocked = true;
     compartment.isBooked = true;
     compartment.currentParcelId = parcel._id;
-    
+
     await locker.save();
 
     // Update parcel
@@ -341,7 +348,21 @@ console.log("DEBUG Locker Lat:", locker.location?.lat, "Lng:", locker.location?.
     await parcel.save();
 
     // Update any secondary parcel collection if needed
-
+    await client.messages
+      .create({
+        to: `whatsapp:+91${parcel.receiverPhone}`,  
+        from: "whatsapp:+15558076515",
+        contentSid: 'HX4200777a18b1135e502d60b796efe670',
+        contentVariables: JSON.stringify({
+          1: `${parcel.receiverName}`, // Sender name
+          2: `${parcel.senderName}`,
+          3: `/incoming/${parcel._id}/qr`,
+          4: `/dir/?api=1&destination= ${parcel.lockerLat},${parcel.lockerLng}`, // Parcel ID
+        }), // Template SID
+      })
+     .then(message => console.log('Sent:', message.sid, 'Content SID:', message.contentSid))
+      .catch((error) => console.error("❌ WhatsApp Message Error:", error));
+      
     io.emit("parcelUpdated", {
       parcelId: parcel._id,
       status: parcel.status,
