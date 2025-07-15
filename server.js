@@ -348,26 +348,26 @@ app.post("/api/locker/scan", async (req, res) => {
     await parcel.save();
 
     // Update any secondary parcel collection if needed
-    await client.messages
-      .create({
-        to: `whatsapp:+91${parcel.receiverPhone}`,  
-        from: "whatsapp:+15558076515",
-        contentSid: 'HX4200777a18b1135e502d60b796efe670',
-        contentVariables: JSON.stringify({
-          1: `${parcel.receiverName}`, // Sender name
-          2: `${parcel.senderName}`,
-          3: `/incoming/${parcel._id}/qr`,
-          4: `/dir/?api=1&destination= ${parcel.lockerLat},${parcel.lockerLng}`, // Parcel ID
-        }), // Template SID
-      })
-     .then(message => console.log('Sent:', message.sid, 'Content SID:', message.contentSid))
-      .catch((error) => console.error("❌ WhatsApp Message Error:", error));
+    await client.messages.create({
+   
+  to: `whatsapp:+91${parcel.receiverPhone}`,
+   from: 'whatsapp:+15558076515',
+  contentSid: 'HX4200777a18b1135e502d60b796efe670', // Approved Template SID
+  contentVariables: JSON.stringify({
+    1: parcel.receiverName,
+    2: parcel.senderName,
+    3: `incoming/${parcel._id}/qr`,
+    4: `dir/?api=1&destination=${parcel.lockerLat},${parcel.lockerLng}`
+  })
+  
+});
+
       
     io.emit("parcelUpdated", {
       parcelId: parcel._id,
       status: parcel.status,
       lockerId: parcel.lockerId,
-      compartmentId: parcel.compartmentId,
+      compartmentId: parcel.compartmentId, 
       pickedUpAt: parcel.pickedUpAt,
       droppedAt: parcel.droppedAt,
     });
@@ -451,6 +451,17 @@ app.post("/api/locker/scan", async (req, res) => {
     // client.on("error", (err) => {
     //   console.error("❌ BU Emulator error:", err);
     // });
+    await client.messages.create({
+   
+  to: `whatsapp:+91${parcel.senderPhone}`,
+   from: 'whatsapp:+15558076515',
+  contentSid: 'HXdd98675e250a64d0e8005eac0c926905', // Approved Template SID
+  contentVariables: JSON.stringify({
+    1: parcel.senderName,
+    2: parcel.receiverName,
+  })
+   
+});
     io.emit("parcelUpdated", {
       parcelId: parcel._id,
       status: parcel.status,

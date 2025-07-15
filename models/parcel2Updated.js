@@ -4,6 +4,7 @@ const ParcelSchema = new mongoose.Schema({
   senderId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
   senderName: String,
   receiverName: String,
+  senderPhone : {type: String},
   receiverPhone: { type: String, required: true },
   description: String,
   type: { type: String, enum: ["document", "package", "gift", "other"], required: true },
