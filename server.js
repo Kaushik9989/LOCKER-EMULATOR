@@ -455,7 +455,7 @@ app.post("/api/locker/scan", async (req, res) => {
    
   to: `whatsapp:+91${parcel.senderPhone}`,
    from: 'whatsapp:+15558076515',
-  contentSid: 'HXdd98675e250a64d0e8005eac0c926905', // Approved Template SID
+  contentSid: 'HX1d17c8746050e52d99090e99de5a07ac', // Approved Template SID
   contentVariables: JSON.stringify({
     1: parcel.senderName,
     2: parcel.receiverName,
