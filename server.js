@@ -42,7 +42,7 @@ const Courier = require("./models/Courier.js");
 const Parcel = require("./models/Parcel");
 
 const app = express();
-const PORT = 8080;
+const PORT = 3030;
 const Razorpay = require("razorpay");
 const crypto = require("crypto");
 const ejsMate = require("ejs-mate");
@@ -268,9 +268,12 @@ app.get("/locker/emulator/:lockerId", async (req, res) => {
 const twilio = require("twilio");
 
 const client = twilio(process.env.TWILIO_SID, process.env.TWILIO_AUTH_TOKEN);
-app.post("/api/locker/scan", async (req, res) => {
-  const { accessCode } = req.body;
 
+
+
+app.post("/api/locker/scan", async (req, res) => {
+  const { accessCode, prestatus } = req.body;
+  console.log(prestatus);
   if (!accessCode) {
     return res
       .status(400)
@@ -292,28 +295,31 @@ app.post("/api/locker/scan", async (req, res) => {
   }
 
   if (parcel.status === "awaiting_drop") {
-    // Get lockerId from request (where the user scanned)
     const { lockerId } = req.body;
 
     if (!lockerId) {
-      return res.status(400).json({
+      return res
+      .status(400)
+      .json({
         success: false,
         message: "Locker ID is required for drop-off.",
       });
     }
-    // Find that specific locker
+
+    // If locker was predefined in parcel (e.g. via QR), enforce locker match
+   if (parcel.lockerId && parcel.lockerId !== lockerId) {
+  return res
+    .status(400)
+    .json({
+      success: false,
+      message: `This parcel is assigned to locker ${parcel.lockerId}. Please scan it at the correct locker.`,
+      lockerMismatch: true, // 👈 Add this
+      expectedLocker: parcel.lockerId // 👈 Optional: for UI display
+    });
+}
+
     const locker = await Locker.findOne({ lockerId });
-    console.log("DEBUG Locker:", locker);
-    parcel.lockerLat = locker.location.lat;
-    parcel.lockerLng = locker.location.lng;
-    console.log("DEBUG Locker Location:", locker.location);
-    console.log(
-      "DEBUG Locker Lat:",
-      locker.location?.lat,
-      "Lng:",
-      locker.location?.lng
-    );
-    console.log("PARCEL LOCATION", parcel.lockerLat);
+
     if (!locker) {
       return res.status(404).json({
         success: false,
@@ -321,11 +327,11 @@ app.post("/api/locker/scan", async (req, res) => {
       });
     }
 
-    // Look for a free compartment in that locker
     const compartment = locker.compartments.find((c) => !c.isBooked);
-
     if (!compartment) {
-      return res.status(503).json({
+      return res
+      .status(400)
+      .json({
         success: false,
         message: "No available compartments in this locker.",
       });
@@ -335,39 +341,33 @@ app.post("/api/locker/scan", async (req, res) => {
     compartment.isLocked = true;
     compartment.isBooked = true;
     compartment.currentParcelId = parcel._id;
-
     await locker.save();
 
-    // Update parcel
+    // Update parcel with locker info
     parcel.status = "awaiting_pick";
     parcel.lockerLat = locker.location.lat;
     parcel.lockerLng = locker.location.lng;
-    parcel.lockerId = locker.lockerId;
+    parcel.lockerId = locker.lockerId; // (re)assign if not already
     parcel.compartmentId = compartment.compartmentId;
     parcel.droppedAt = new Date();
     await parcel.save();
 
-    // Update any secondary parcel collection if needed
+    // Notify Receiver
     await client.messages.create({
-   
-  to: `whatsapp:+91${parcel.receiverPhone}`,
-   from: 'whatsapp:+15558076515',
-  contentSid: 'HX4200777a18b1135e502d60b796efe670', // Approved Template SID
-  contentVariables: JSON.stringify({
-    1: parcel.receiverName,
-    2: parcel.senderName,
-    3: `incoming/${parcel._id}/qr`,
-    4: `dir/?api=1&destination=${parcel.lockerLat},${parcel.lockerLng}`
-  })
-  
-});
+      to: `whatsapp:+91${parcel.senderPhone}`,
+      from: "whatsapp:+15558076515",
+      contentSid: "HXa7a69894f9567b90c1cacab6827ff46c",
+      contentVariables: JSON.stringify({
+        1: parcel.senderName,
+        2: `incoming/${parcel._id}/qr`,
+      }),
+    });
 
-      
     io.emit("parcelUpdated", {
       parcelId: parcel._id,
       status: parcel.status,
       lockerId: parcel.lockerId,
-      compartmentId: parcel.compartmentId, 
+      compartmentId: parcel.compartmentId,
       pickedUpAt: parcel.pickedUpAt,
       droppedAt: parcel.droppedAt,
     });
@@ -380,14 +380,14 @@ app.post("/api/locker/scan", async (req, res) => {
       status: "awaiting_drop",
     });
   }
-
+  if(prestatus!="awaiting_drop"){
   if (parcel.status === "awaiting_pick" || parcel.status === "in_locker") {
     // This is a pickup
 
     const { lockerId } = req.body;
 
     if (!parcel.lockerId || !parcel.compartmentId) {
-      return res.status(400).json({
+        return res.json({
         success: false,
         message: "Parcel is not assigned to any locker.",
       });
@@ -395,7 +395,7 @@ app.post("/api/locker/scan", async (req, res) => {
 
     // Check that the scanned locker matches the parcel's locker
     if (lockerId !== parcel.lockerId) {
-      return res.status(400).json({
+        return res.json({
         success: false,
         message: `This parcel belongs to locker ${parcel.lockerId}. Please scan it at the correct locker.`,
       });
@@ -414,15 +414,11 @@ app.post("/api/locker/scan", async (req, res) => {
       (c) => c.compartmentId === parcel.compartmentId
     );
     if (!compartment) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Compartment not found." });
+       return res.json({ success: false, message: "Compartment not found." });
     }
 
     if (!compartment.isLocked) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Compartment is already unlocked." });
+       return res.json({ success: false, message: "Compartment is already unlocked." });
     }
 
     // Unlock compartment
@@ -452,16 +448,14 @@ app.post("/api/locker/scan", async (req, res) => {
     //   console.error("❌ BU Emulator error:", err);
     // });
     await client.messages.create({
-   
-  to: `whatsapp:+91${parcel.senderPhone}`,
-   from: 'whatsapp:+15558076515',
-  contentSid: 'HX1d17c8746050e52d99090e99de5a07ac', // Approved Template SID
-  contentVariables: JSON.stringify({
-    1: parcel.senderName,
-    2: parcel.receiverName,
-  })
-   
-});
+      to: `whatsapp:+91${parcel.senderPhone}`,
+      from: "whatsapp:+15558076515",
+      contentSid: "HX5d9cb78910c37088fb14e660af060c1b", // Approved Template SID
+      contentVariables: JSON.stringify({
+        1: parcel.senderName,
+        2: parcel.receiverName,
+      }),
+    });
     io.emit("parcelUpdated", {
       parcelId: parcel._id,
       status: parcel.status,
@@ -478,7 +472,7 @@ app.post("/api/locker/scan", async (req, res) => {
       status: "awaiting_pick",
     });
   }
-
+}
   // If status is something else
   return res
     .status(400)

@@ -411,8 +411,10 @@
                 updateLockerScreen("authenticating");
 
                 let accessCode;
+                let prestatus;
                 try {
                     accessCode = JSON.parse(decodedText).accessCode;
+                    prestatus = JSON.parse(decodedText).prestatus;
                     if (!accessCode) throw new Error("Missing accessCode");
                 } catch (e) {
                     return handleError("Invalid QR format");
@@ -421,7 +423,7 @@
                 fetch("/api/locker/scan", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ accessCode, lockerId, status })
+                    body: JSON.stringify({ accessCode, lockerId, status,prestatus })
                 })
                     .then(r => r.json())
                     .then(json => {
