@@ -366,6 +366,7 @@
                 sub.textContent = "Place your parcel";
                 icon.className = "bi bi-unlock-fill fs-3 mb-2";
                 break;
+            
             case "awaiting_pick":
                 main.textContent = "Locker Unlocked";
                 sub.textContent = "Pick your parcel";
@@ -412,9 +413,11 @@
 
                 let accessCode;
                 let prestatus;
+                let modifystatus;
                 try {
                     accessCode = JSON.parse(decodedText).accessCode;
                     prestatus = JSON.parse(decodedText).prestatus;
+                    modifystatus = JSON.parse(decodedText).modifystatus;
                     if (!accessCode) throw new Error("Missing accessCode");
                 } catch (e) {
                     return handleError("Invalid QR format");
@@ -423,7 +426,7 @@
                 fetch("/api/locker/scan", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ accessCode, lockerId, status,prestatus })
+                    body: JSON.stringify({ accessCode, lockerId, status,prestatus, modifystatus })
                 })
                     .then(r => r.json())
                     .then(json => {

@@ -272,8 +272,9 @@ const client = twilio(process.env.TWILIO_SID, process.env.TWILIO_AUTH_TOKEN);
 
 
 app.post("/api/locker/scan", async (req, res) => {
-  const { accessCode, prestatus } = req.body;
+  const { accessCode, prestatus, modifystatus } = req.body;
   console.log(prestatus);
+  console.log(modifystatus);
   if (!accessCode) {
     return res
       .status(400)
@@ -353,15 +354,15 @@ app.post("/api/locker/scan", async (req, res) => {
     await parcel.save();
 
     // Notify Receiver
-    await client.messages.create({
-      to: `whatsapp:+91${parcel.senderPhone}`,
-      from: "whatsapp:+15558076515",
-      contentSid: "HXa7a69894f9567b90c1cacab6827ff46c",
-      contentVariables: JSON.stringify({
-        1: parcel.senderName,
-        2: `incoming/${parcel._id}/qr`,
-      }),
-    });
+    // await client.messages.create({
+    //   to: `whatsapp:+91${parcel.senderPhone}`,
+    //   from: "whatsapp:+15558076515",
+    //   contentSid: "HXa7a69894f9567b90c1cacab6827ff46c",
+    //   contentVariables: JSON.stringify({
+    //     1: parcel.senderName,
+    //     2: `incoming/${parcel._id}/qr`,
+    //   }),
+    // });
 
     io.emit("parcelUpdated", {
       parcelId: parcel._id,
@@ -383,7 +384,7 @@ app.post("/api/locker/scan", async (req, res) => {
   if(prestatus!="awaiting_drop"){
   if (parcel.status === "awaiting_pick" || parcel.status === "in_locker") {
     // This is a pickup
-
+    
     const { lockerId } = req.body;
 
     if (!parcel.lockerId || !parcel.compartmentId) {
@@ -418,9 +419,37 @@ app.post("/api/locker/scan", async (req, res) => {
     }
 
     if (!compartment.isLocked) {
-       return res.json({ success: false, message: "Compartment is already unlocked." });
-    }
+  return res.json({ success: false, message: "Compartment is already unlocked." });
+}
 
+// If this is a MODIFY QR flow
+if (modifystatus === "modify") {
+  // Just unlock to allow placing again
+  compartment.isLocked = false;
+  await locker.save();
+
+  return res.json({
+    success: true,
+    message: `Compartment ${compartment.compartmentId} unlocked for re-drop.`,
+    status: "awaiting_pick",
+    compartmentId: compartment.compartmentId,
+    lockerId: locker._id,
+    modify: true,
+  });
+}
+
+// Otherwise: normal pickup flow
+compartment.isLocked = false;
+compartment.isBooked = false;
+compartment.currentParcelId = null;
+await locker.save();
+
+// Update parcel
+parcel.status = "picked";
+parcel.pickedUpAt = new Date();
+await parcel.save();
+
+    
     // Unlock compartment
     compartment.isLocked = false;
     compartment.isBooked = false;
@@ -447,15 +476,15 @@ app.post("/api/locker/scan", async (req, res) => {
     // client.on("error", (err) => {
     //   console.error("❌ BU Emulator error:", err);
     // });
-    await client.messages.create({
-      to: `whatsapp:+91${parcel.senderPhone}`,
-      from: "whatsapp:+15558076515",
-      contentSid: "HX5d9cb78910c37088fb14e660af060c1b", // Approved Template SID
-      contentVariables: JSON.stringify({
-        1: parcel.senderName,
-        2: parcel.receiverName,
-      }),
-    });
+    // await client.messages.create({
+    //   to: `whatsapp:+91${parcel.senderPhone}`,
+    //   from: "whatsapp:+15558076515",
+    //   contentSid: "HX5d9cb78910c37088fb14e660af060c1b", // Approved Template SID
+    //   contentVariables: JSON.stringify({
+    //     1: parcel.senderName,
+    //     2: parcel.receiverName,
+    //   }),
+    // });
     io.emit("parcelUpdated", {
       parcelId: parcel._id,
       status: parcel.status,

@@ -23,7 +23,7 @@ const ParcelSchema = new mongoose.Schema({
     default: "awaiting_drop",
   },
   cost: { type: mongoose.Decimal128, required: true, default : 0},
-  paymentOption: { type: String, enum: ["sender_pays", "receiver_pays"], required: true },
+  paymentOption: { type: String, enum: ["sender_pays", "receiver_pays"] },
   paymentStatus: { type: String, enum: ["pending", "completed"], default: "pending" },
   droppedAt: Date,
   pickedAt: Date,
