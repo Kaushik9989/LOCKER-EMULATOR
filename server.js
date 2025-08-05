@@ -363,7 +363,16 @@ app.post("/api/locker/scan", async (req, res) => {
         2: `incoming/${parcel._id}/qr`,
       }),
     });
-
+      await client.messages.create({
+      to: `whatsapp:+91${parcel.receiverPhone}`,
+      from: "whatsapp:+15558076515",
+      contentSid: "HX4200777a18b1135e502d60b796efe670", // Approved Template SID
+      contentVariables: JSON.stringify({
+        1: parcel.receiverName,
+        2: parcel.senderName,
+        3:`mobile/incoming/${parcel._id}/qr`
+      }),
+    });
     io.emit("parcelUpdated", {
       parcelId: parcel._id,
       status: parcel.status,
@@ -476,6 +485,7 @@ await parcel.save();
     // client.on("error", (err) => {
     //   console.error("❌ BU Emulator error:", err);
     // });
+
     await client.messages.create({
       to: `whatsapp:+91${parcel.senderPhone}`,
       from: "whatsapp:+15558076515",
