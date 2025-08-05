@@ -353,16 +353,16 @@ app.post("/api/locker/scan", async (req, res) => {
     parcel.droppedAt = new Date();
     await parcel.save();
 
-    // Notify Receiver
-    // await client.messages.create({
-    //   to: `whatsapp:+91${parcel.senderPhone}`,
-    //   from: "whatsapp:+15558076515",
-    //   contentSid: "HXa7a69894f9567b90c1cacab6827ff46c",
-    //   contentVariables: JSON.stringify({
-    //     1: parcel.senderName,
-    //     2: `incoming/${parcel._id}/qr`,
-    //   }),
-    // });
+    //Notify Receiver
+    await client.messages.create({
+      to: `whatsapp:+91${parcel.senderPhone}`,
+      from: "whatsapp:+15558076515",
+      contentSid: "HXa7a69894f9567b90c1cacab6827ff46c",
+      contentVariables: JSON.stringify({
+        1: parcel.senderName,
+        2: `incoming/${parcel._id}/qr`,
+      }),
+    });
 
     io.emit("parcelUpdated", {
       parcelId: parcel._id,
@@ -476,15 +476,15 @@ await parcel.save();
     // client.on("error", (err) => {
     //   console.error("❌ BU Emulator error:", err);
     // });
-    // await client.messages.create({
-    //   to: `whatsapp:+91${parcel.senderPhone}`,
-    //   from: "whatsapp:+15558076515",
-    //   contentSid: "HX5d9cb78910c37088fb14e660af060c1b", // Approved Template SID
-    //   contentVariables: JSON.stringify({
-    //     1: parcel.senderName,
-    //     2: parcel.receiverName,
-    //   }),
-    // });
+    await client.messages.create({
+      to: `whatsapp:+91${parcel.senderPhone}`,
+      from: "whatsapp:+15558076515",
+      contentSid: "HX5d9cb78910c37088fb14e660af060c1b", // Approved Template SID
+      contentVariables: JSON.stringify({
+        1: parcel.senderName,
+        2: parcel.receiverName,
+      }),
+    });
     io.emit("parcelUpdated", {
       parcelId: parcel._id,
       status: parcel.status,
