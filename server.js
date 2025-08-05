@@ -241,8 +241,9 @@ app.post("/api/nearest-locker", async (req, res) => {
   }
 });
 
-app.get("/", (req, res) => {
-  res.render("lockerEmu");
+app.get("/", async(req, res) => {
+  const lockers = await Locker.find();
+  res.render("lockerEmu",{lockers});
 });
 
 app.get("/locker/emulator/:lockerId", async (req, res) => {

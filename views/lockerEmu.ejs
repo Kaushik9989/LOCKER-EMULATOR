@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -7,15 +8,24 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
   <style>
+#locker-map {
+  width: 100%;
+  height: 350px;
+  margin-bottom: 100px;
+}
+
+
     body {
       background: #f8f9fb;
       font-family: "Inter", sans-serif;
     }
+
     .station-card {
       background: #e9ecef;
       border-radius: 0.75rem;
       min-height: 100px;
     }
+
     .cta-card {
       background: #eef3fc;
       border: 1px solid #dbe6f9;
@@ -23,6 +33,7 @@
       text-align: center;
       padding: 2rem 1rem;
     }
+
     .cta-button {
       background: #000;
       color: #fff;
@@ -32,9 +43,11 @@
       border-radius: 0.5rem;
       transition: all 0.2s ease;
     }
+
     .cta-button:hover {
       background: #333;
     }
+
     .status-dot {
       width: 10px;
       height: 10px;
@@ -42,10 +55,12 @@
       border-radius: 50%;
       display: inline-block;
     }
+
     .locker-info {
       font-size: 0.9rem;
       color: #6c757d;
     }
+
     .version-badge {
       font-size: 0.8rem;
       background: #e9ecef;
@@ -53,7 +68,15 @@
       padding: 0.25rem 0.5rem;
     }
   </style>
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js">
+  </script>
+
 </head>
+
 <body>
   <div class="container py-4">
     <!-- Header -->
@@ -69,7 +92,8 @@
     </div>
     <h4>Your Nearest Locker</h4>
     <!-- Station Info -->
-    <div id="station-card" class="station-card p-3 d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
+    <div id="station-card"
+      class="station-card p-3 d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
       <div>
         <strong><i class="bi bi-geo-alt me-1"></i> <span id="station-name">Detecting...</span></strong><br>
         <small id="station-address">Fetching nearest locker...</small><br>
@@ -79,7 +103,7 @@
         <small>Locker ID: <strong id="station-id">—</strong></small>
         <span class="status-dot"></span>
         <small class="ms-1">Online</small>
-        
+
       </div>
       <button class="cta-button">
         <i class="bi bi-lightning-fill me-1"></i>
@@ -87,6 +111,7 @@
 
       </button>
     </div>
+       <div id="locker-map"></div>
 
     <!-- Call To Action -->
     <div class="cta-card mx-auto" style="max-width:500px;">
@@ -95,23 +120,84 @@
       </div>
       <h6 class="mb-2">Start Locker Operation</h6>
       <p class="mb-3 text-muted">Show your QR code to the camera for instant access</p>
-      
+
       <p class="locker-info mt-3">Supports pickup, drop-off, and purchases</p>
       <div class="mt-4">
-  <input
-    type="text"
-    id="manual-locker-id"
-    class="form-control mb-2"
-    placeholder="Enter Locker ID"
-  />
-  <button class="cta-button w-100" id="manual-open-btn">
-    <i class="bi bi-box-arrow-in-right me-1"></i>
-    Open Locker Emulator
-  </button>
-</div>
+        <input type="text" id="manual-locker-id" class="form-control mb-2" placeholder="Enter Locker ID" />
+        <button class="cta-button w-100" id="manual-open-btn">
+          <i class="bi bi-box-arrow-in-right me-1"></i>
+          Open Locker Emulator
+        </button>
+      </div>
 
     </div>
   </div>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      if (typeof L === 'undefined') {
+        console.error("Leaflet not loaded!");
+        return;
+      }
+
+      const map = L.map('locker-map').setView([17.385044, 78.486671], 11);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors'
+      }).addTo(map);
+
+      const lockers = <%- JSON.stringify(lockers || [
+        { lockerId: "HYD001", location: { lat: 17.385044, lng: 78.486671, address: "Secunderabad Station" }},
+        { lockerId: "HYD002", location: { lat: 17.425, lng: 78.45, address: "Kukatpally Metro" }}
+      ]) %>;
+
+      lockers.forEach(locker => {
+        if (locker.location?.lat && locker.location?.lng) {
+          const marker = L.marker([locker.location.lat, locker.location.lng]).addTo(map);
+          marker.bindPopup(`
+            <b>${locker.lockerId}</b><br>
+            ${locker.location.address || ''}<br>
+            <a href="https://locker.droppoint.in/locker/emulator/${locker.lockerId}" target="_blank" class="btn btn-sm btn-dark mt-2">
+              <i class="fas fa-location-arrow"></i> Emulator
+            </a>
+          `);
+        }
+      });
+
+      // Fix initial sizing issues
+      setTimeout(() => map.invalidateSize(), 200);
+
+      let userCoords = null;
+
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(position => {
+          userCoords = [position.coords.latitude, position.coords.longitude];
+
+          const userIcon = L.icon({
+            iconUrl: 'https://cdn-icons-png.flaticon.com/512/64/64572.png',
+            iconSize: [32, 32],
+            iconAnchor: [16, 32],
+            popupAnchor: [0, -30]
+          });
+
+          L.marker(userCoords, { icon: userIcon }).addTo(map).bindPopup("You are here").openPopup();
+          map.setView(userCoords, 13);
+        }, error => {
+          console.warn("Geolocation error:", error.message);
+        });
+      }
+
+      const recenterBtn = document.getElementById('recenter-btn');
+      recenterBtn.addEventListener('click', () => {
+        if (userCoords) {
+          map.setView(userCoords, 13);
+        } else {
+          alert("Your location is not available.");
+        }
+      });
+    });
+  </script>
+
+
 
   <script>
     document.addEventListener("DOMContentLoaded", () => {
@@ -139,9 +225,9 @@
                   stationAddressEl.textContent = `Lat: ${data.locker.coordinates.lat.toFixed(5)}, Lng: ${data.locker.coordinates.lng.toFixed(5)}`;
                   totalLockersEl.textContent = `${data.locker.availableCompartments}/${data.locker.totalCompartments}`;
                   stationIdEl.textContent = data.locker.lockerId;
-                   const lockerLinkEl = document.getElementById("locker-link");
-lockerLinkEl.href = `/locker/emulator/${data.locker.lockerId}`;
-lockerLinkEl.classList.remove("disabled");
+                  const lockerLinkEl = document.getElementById("locker-link");
+                  lockerLinkEl.href = `/locker/emulator/${data.locker.lockerId}`;
+                  lockerLinkEl.classList.remove("disabled");
                 } else {
                   stationNameEl.textContent = "No locker found";
                   stationAddressEl.textContent = data.message || "No lockers nearby.";
@@ -164,20 +250,21 @@ lockerLinkEl.classList.remove("disabled");
         stationAddressEl.textContent = "Geolocation not available.";
       }
     });
-   // Manual locker ID handling
-const manualInput = document.getElementById("manual-locker-id");
-const manualButton = document.getElementById("manual-open-btn");
+    // Manual locker ID handling
+    const manualInput = document.getElementById("manual-locker-id");
+    const manualButton = document.getElementById("manual-open-btn");
 
-manualButton.addEventListener("click", () => {
-  const lockerId = manualInput.value.trim();
-  if (!lockerId) {
-    alert("Please enter a Locker ID.");
-    return;
-  }
-  // Navigate to emulator page
-  window.location.href = `/locker/emulator/${lockerId}`;
-});
+    manualButton.addEventListener("click", () => {
+      const lockerId = manualInput.value.trim();
+      if (!lockerId) {
+        alert("Please enter a Locker ID.");
+        return;
+      }
+      // Navigate to emulator page
+      window.location.href = `/locker/emulator/${lockerId}`;
+    });
 
   </script>
 </body>
+
 </html>
