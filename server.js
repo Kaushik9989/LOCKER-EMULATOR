@@ -375,6 +375,9 @@ app.post("/api/locker/scan", express.text({ type: '*/*' }),async (req, res) => {
     await parcel.save();
 
     //Notify Receiver
+    if(parcel.store_self){
+
+
     await client.messages.create({
       to: `whatsapp:+91${parcel.senderPhone}`,
       from: "whatsapp:+15558076515",
@@ -384,6 +387,7 @@ app.post("/api/locker/scan", express.text({ type: '*/*' }),async (req, res) => {
         2: `mobile/incoming/${parcel._id}/qr`,
       }),
     });
+        }
       await client.messages.create({
       to: `whatsapp:+91${parcel.receiverPhone}`,
       from: "whatsapp:+15558076515",
