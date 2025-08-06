@@ -381,7 +381,7 @@ app.post("/api/locker/scan", express.text({ type: '*/*' }),async (req, res) => {
       contentSid: "HXa7a69894f9567b90c1cacab6827ff46c",
       contentVariables: JSON.stringify({
         1: parcel.senderName,
-        2: `incoming/${parcel._id}/qr`,
+        2: `mobile/incoming/${parcel._id}/qr`,
       }),
     });
       await client.messages.create({
