@@ -67,6 +67,10 @@
       border-radius: 0.5rem;
       padding: 0.25rem 0.5rem;
     }
+    #recenter-btn {
+  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
   </style>
   <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -74,6 +78,7 @@
   <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js">
   </script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
 
 </head>
 
@@ -115,7 +120,20 @@
         <h3 class="mb-1">Lockers Near You</h3>
         <small class="text-muted mb-5">Click on the pinpoint to access </small>
       </div>
-       <div id="locker-map"></div>
+      <!-- Recenter Button -->
+<!-- Map wrapper to position button absolutely -->
+<div style="position: relative;">
+  <!-- Recenter Button -->
+  <div style="position: absolute; top: 10px; right: 10px; z-index: 1000;">
+    <button id="recenter-btn" class="btn btn-dark btn-sm">
+      <i class="bi bi-crosshair"></i> Recenter
+    </button>
+  </div>
+
+  <!-- Locker Map -->
+  <div id="locker-map"></div>
+</div>
+
 
     <!-- Call To Action -->
     <div class="cta-card mx-auto" style="max-width:500px;">
@@ -153,10 +171,17 @@
         { lockerId: "HYD001", location: { lat: 17.385044, lng: 78.486671, address: "Secunderabad Station" }},
         { lockerId: "HYD002", location: { lat: 17.425, lng: 78.45, address: "Kukatpally Metro" }}
       ]) %>;
+const lockIcon = L.divIcon({
+  html: `<i class="fa-solid fa-shop-lock fa-beat fa-2xl" style="color: #706fbe;"></i>`,
+  className: '', // Prevent Leaflet default icon styles
+  iconSize: [30, 30],
+  iconAnchor: [15, 30] // adjust so icon points properly
+});
+
 
       lockers.forEach(locker => {
         if (locker.location?.lat && locker.location?.lng) {
-          const marker = L.marker([locker.location.lat, locker.location.lng]).addTo(map);
+          const marker = L.marker([locker.location.lat, locker.location.lng],{ icon: lockIcon }).addTo(map);
           marker.bindPopup(`
             <b>${locker.lockerId}</b><br>
             ${locker.location.address || ''}<br>
