@@ -272,10 +272,31 @@ const client = twilio(process.env.TWILIO_SID, process.env.TWILIO_AUTH_TOKEN);
 
 
 
-app.post("/api/locker/scan", async (req, res) => {
-  const { accessCode, prestatus, modifystatus } = req.body;
-  console.log(prestatus);
-  console.log(modifystatus);
+
+
+
+app.get('/qr-reader', (req, res) => {
+  res.render('newQRreader'); // assuming file is views/qr-reader.ejs
+}); 
+
+
+app.post('/api/locker/scan1', express.text({ type: '*/*' }), (req, res) => {
+  const raw = req.body;
+  const jsonData = { "accessCode": Number(raw) }; 
+  console.log('📥 Raw body:', jsonData); // Should log: 123123|L049
+
+  const [accessCode, lockerId] = raw.split('|');
+
+  console.log('✅ Access Code:', accessCode);
+  if (lockerId) console.log('🔐 Locker ID:', lockerId);
+
+  res.send(accessCode);
+});
+
+app.post("/api/locker/scan", express.text({ type: '*/*' }),async (req, res) => {
+     const [accessCode, lockerId] = req.body.split("///");
+   console.log(req.body);
+   
   if (!accessCode) {
     return res
       .status(400)
@@ -297,7 +318,6 @@ app.post("/api/locker/scan", async (req, res) => {
   }
 
   if (parcel.status === "awaiting_drop") {
-    const { lockerId } = req.body;
 
     if (!lockerId) {
       return res
@@ -391,11 +411,11 @@ app.post("/api/locker/scan", async (req, res) => {
       status: "awaiting_drop",
     });
   }
-  if(prestatus!="awaiting_drop"){
+
   if (parcel.status === "awaiting_pick" || parcel.status === "in_locker") {
     // This is a pickup
     
-    const { lockerId } = req.body;
+   const [accessCode, lockerId] = req.body.split("///");
 
     if (!parcel.lockerId || !parcel.compartmentId) {
         return res.json({
@@ -433,20 +453,7 @@ app.post("/api/locker/scan", async (req, res) => {
 }
 
 // If this is a MODIFY QR flow
-if (modifystatus === "modify") {
-  // Just unlock to allow placing again
-  compartment.isLocked = false;
-  await locker.save();
 
-  return res.json({
-    success: true,
-    message: `Compartment ${compartment.compartmentId} unlocked for re-drop.`,
-    status: "awaiting_pick",
-    compartmentId: compartment.compartmentId,
-    lockerId: locker._id,
-    modify: true,
-  });
-}
 
 // Otherwise: normal pickup flow
 compartment.isLocked = false;
@@ -512,7 +519,7 @@ await parcel.save();
       status: "awaiting_pick",
     });
   }
-}
+
   // If status is something else
   return res
     .status(400)

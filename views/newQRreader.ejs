@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>QR Reader - Raw Text Send</title>
+  <style>
+    body { font-family: sans-serif; padding: 2rem; }
+    #qr-input { width: 300px; padding: 0.5rem; font-size: 1rem; }
+    #output { font-size: 1.2rem; color: green; margin-top: 1rem; }
+  </style>
+</head>
+<body>
+  <h2>Scan QR Code (Send Raw Access Code)</h2>
+  <input id="qr-input" type="text" placeholder="Waiting for scan..." autofocus />
+  <div id="output">Access Code: <span id="access-code">None</span></div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const input = document.getElementById('qr-input');
+      const accessCodeDisplay = document.getElementById('access-code');
+      let scanTimeout;
+
+      input.focus();
+      setInterval(() => input.focus(), 300);
+
+      input.addEventListener('input', () => {
+        clearTimeout(scanTimeout);
+
+        scanTimeout = setTimeout(() => {
+          const scannedData = input.value.trim();
+          input.value = '';
+
+          const accessCode = scannedData.split("///")[0];
+          console.log("✅ Access Code:", accessCode);
+          accessCodeDisplay.textContent = accessCode;
+
+          // ✅ Send raw text (not JSON)
+          fetch('/api/locker/scan1', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'text/plain'
+            },
+            body: accessCode
+          })
+          .then(res => res.text())
+          .then(data => console.log('📦 API Response:', data))
+          .catch(err => console.error('❌ API Error:', err));
+
+        }, 500);
+      });
+    });
+  </script>
+</body>
+</html>
