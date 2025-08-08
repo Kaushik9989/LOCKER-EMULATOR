@@ -3,7 +3,7 @@ const mongoose = require("mongoose");
 const http = require("http");
 const { Server } = require("socket.io");
 const cors = require("cors");
-const net = require("net");
+
 const LRU = require("lru-cache");
 
 const dashboardCache = new LRU.LRUCache({
@@ -140,19 +140,6 @@ passport.deserializeUser(async (id, done) => {
   done(null, user);
 });
 
-function buildKerongUnlockPacket(locknum) {
-  const STX = 0x02;
-  const ADDR = 0x00;
-  const CMD = 0x81;
-  const ASK = 0x00;
-  const DATALEN = 0x00;
-  const ETX = 0x03;
-
-  const sum = (STX + ADDR + locknum + CMD + ASK + DATALEN + ETX) % 256;
-
-  return Buffer.from([STX, ADDR, locknum, CMD, ASK, DATALEN, ETX, sum]);
-}
-
 function getDistanceFromLatLonInM(lat1, lon1, lat2, lon2) {
   function deg2rad(deg) {
     return deg * (Math.PI / 180);
@@ -275,6 +262,114 @@ const client = twilio(process.env.TWILIO_SID, process.env.TWILIO_AUTH_TOKEN);
 
 
 
+function buildKerongUnlockPacket(compartmentId = 0x00, addr = 0x00) {
+  const STX = 0x02;
+  const CMD = 0x81;
+  const ASK = 0x00;
+  const DATALEN = 0x00;
+  const ETX = 0x03;
+
+  const LOCKNUM = compartmentId; // 0x00 to 0x0B (for 12 lockers)
+  const bytes = [STX, addr, LOCKNUM, CMD, ASK, DATALEN, ETX];
+
+  // ✅ Calculate checksum (last byte)
+  const checksum = bytes.reduce((sum, byte) => sum + byte, 0) & 0xFF;
+  bytes.push(checksum);
+
+  return Buffer.from(bytes);
+}
+
+
+
+function parseKerongUnlockPacket(buffer) {
+  if (!Buffer.isBuffer(buffer)) {
+    buffer = Buffer.from(buffer);
+  }
+
+  if (buffer.length !== 8) {
+    return { error: "Invalid packet length. Expected 8 bytes." };
+  }
+
+  const [STX, ADDR, LOCKNUM, CMD, ASK, DATALEN, ETX, SUM] = buffer;
+
+  const checksum = (STX + ADDR + LOCKNUM + CMD + ASK + DATALEN + ETX) & 0xFF;
+
+  if (checksum !== SUM) {
+    return { error: `Invalid checksum. Expected ${checksum}, got ${SUM}` };
+  }
+
+  if (CMD !== 0x81) {
+    return { error: `Unsupported command 0x${CMD.toString(16)}` };
+  }
+
+  return {
+    boardAddress: ADDR,
+    compartmentId: LOCKNUM,
+    userFacingCompartment: LOCKNUM + 1, // if you want 1-based display
+    command: "unlock",
+    rawHex: buffer.toString("hex").toUpperCase(),
+    summary: `Unlock command for compartment ${LOCKNUM} (lock #${LOCKNUM + 1}) on board address ${ADDR}`,
+  };
+}
+
+
+
+
+
+
+
+const net = require("net");
+
+function sendUnlockPacket(packet) {
+  return new Promise((resolve, reject) => {
+    const client = new net.Socket();
+
+    const BU_IP = "192.168.0.178"; // Replace with your actual BU IP
+    const BU_PORT = 4001;          // Replace with your actual BU port
+
+    client.connect(BU_PORT, BU_IP, () => {
+      console.log("✅ Connected to BU. Sending unlock packet...");
+      console.log("📤 Packet:", packet.toString("hex").toUpperCase());
+      client.write(packet);
+    });
+
+    client.on("data", (data) => {
+      console.log("📥 Response from BU:", data.toString("hex").toUpperCase());
+      client.destroy(); // close socket after receiving response
+      resolve(data);
+    });
+
+    client.on("error", (err) => {
+      console.error("❌ TCP Error:", err.message);
+      client.destroy();
+      reject(err);
+    });
+
+    client.on("close", () => {
+      console.log("🔌 Connection closed");
+    });
+  });
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 app.get('/qr-reader', (req, res) => {
   res.render('newQRreader'); // assuming file is views/qr-reader.ejs
 }); 
@@ -358,7 +453,17 @@ app.post("/api/locker/scan", express.text({ type: '*/*' }),async (req, res) => {
         message: "No available compartments in this locker.",
       });
     }
+    console.log(typeof(compartment.compartmentId));
+    const packet = buildKerongUnlockPacket(parseInt(compartment.compartmentId)); // locker 1 = compartment 0
+console.log("📤 Final Packet:", packet.toString("hex").toUpperCase());
+await sendUnlockPacket(packet);
+    // const packet = buildKerongUnlockPacket(0);
+    // const unlockPacket = buildKerongUnlockPacket(compartment.compartmentId);
+    // // const result = parseKerongUnlockPacket(unlockPacket);
+    // // console.log(result);
+    // await sendUnlockPacket(unlockPacket);
 
+    // await sendUnlockPacket(unlockPacket);
     // Lock the compartment
     compartment.isLocked = true;
     compartment.isBooked = true;
@@ -452,9 +557,13 @@ app.post("/api/locker/scan", express.text({ type: '*/*' }),async (req, res) => {
        return res.json({ success: false, message: "Compartment not found." });
     }
 
+
     if (!compartment.isLocked) {
   return res.json({ success: false, message: "Compartment is already unlocked." });
 }
+    const newpacket = buildKerongUnlockPacket(parseInt(compartment.compartmentId));
+   
+  await sendUnlockPacket(newpacket);
 
 // If this is a MODIFY QR flow
 
