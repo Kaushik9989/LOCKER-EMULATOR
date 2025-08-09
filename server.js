@@ -312,14 +312,8 @@ function parseKerongUnlockPacket(buffer) {
   };
 }
 
-
-
-
-
-
-
 const net = require("net");
-
+const TOTAL_LOCKERS = 2;
 function sendUnlockPacket(packet) {
   return new Promise((resolve, reject) => {
     const client = new net.Socket();
@@ -352,6 +346,83 @@ function sendUnlockPacket(packet) {
 }
 
 
+function buildKerongStatusQueryPacket(compartmentId = 0x00) {
+  const bytes = [0x02, 0x00, compartmentId, 0x80, 0x00, 0x00, 0x03];
+  const checksum = bytes.reduce((sum, b) => sum + b, 0) & 0xFF;
+  bytes.push(checksum);
+  return Buffer.from(bytes);
+}
+
+
+function parseStatusResponse(buffer) {
+  if (buffer.length !== 8 || buffer[3] !== 0x80) {
+    return "unknown";
+  }
+
+  const statusByte = buffer[4];
+  if (statusByte === 0x00) return "unlocked";
+  if (statusByte === 0x01) return "locked";
+  return "unknown";
+}
+async function getAllLockerStatuses() {
+  const lockers = [];
+  for (let i = 0; i < 2; i++) { // test with 2 lockers first
+    const status = await getStatusForLocker(i); // 0-indexed
+    lockers.push({ id: i + 1, status });
+  }
+  return lockers;
+}
+
+
+
+
+async function getStatusForLocker(id) {
+  return new Promise((resolve) => {
+    const client = new net.Socket();
+    const packet = buildKerongStatusQueryPacket(id);
+
+    let resolved = false;
+
+    client.connect(4001, "192.168.0.178", () => {
+      client.write(packet);
+    });
+
+    client.on("data", (data) => {
+      const status = parseStatusResponse(data); // 🧠 Function below
+      resolved = true;
+      resolve(status);
+      client.destroy();
+    });
+
+    client.on("error", (err) => {
+      console.error("❌ TCP Error:", err.message);
+      resolve("unknown");
+    });
+
+    setTimeout(() => {
+      if (!resolved) {
+        resolve("unknown");
+        client.destroy();
+      }
+    }, 500); // timeout if no response
+  });
+}
+
+
+
+
+// 🌐 Route: Locker Status UI
+app.get("/locker-status", async (req, res) => {
+  const lockers = await getAllLockerStatuses();
+  console.log("📦 Status Data:", lockers); // Add this
+  res.render("lockerStatus", {lockers});
+});
+
+// 🧪 API for AJAX or frontend polling
+app.get("/api/locker-status", async (req, res) => {
+  const lockers = await getAllLockerStatuses();
+  res.json(lockers);
+});
 
 
 
@@ -453,17 +524,12 @@ app.post("/api/locker/scan", express.text({ type: '*/*' }),async (req, res) => {
         message: "No available compartments in this locker.",
       });
     }
-    console.log(typeof(compartment.compartmentId));
+
+    if (client && !client.destroyed){
     const packet = buildKerongUnlockPacket(parseInt(compartment.compartmentId)); // locker 1 = compartment 0
 console.log("📤 Final Packet:", packet.toString("hex").toUpperCase());
 await sendUnlockPacket(packet);
-    // const packet = buildKerongUnlockPacket(0);
-    // const unlockPacket = buildKerongUnlockPacket(compartment.compartmentId);
-    // // const result = parseKerongUnlockPacket(unlockPacket);
-    // // console.log(result);
-    // await sendUnlockPacket(unlockPacket);
-
-    // await sendUnlockPacket(unlockPacket);
+    }
     // Lock the compartment
     compartment.isLocked = true;
     compartment.isBooked = true;
@@ -561,10 +627,11 @@ await sendUnlockPacket(packet);
     if (!compartment.isLocked) {
   return res.json({ success: false, message: "Compartment is already unlocked." });
 }
+if (client && !client.destroyed){
     const newpacket = buildKerongUnlockPacket(parseInt(compartment.compartmentId));
    
   await sendUnlockPacket(newpacket);
-
+}
 // If this is a MODIFY QR flow
 
 
