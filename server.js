@@ -314,36 +314,55 @@ function parseKerongUnlockPacket(buffer) {
 
 const net = require("net");
 const TOTAL_LOCKERS = 2;
-function sendUnlockPacket(packet) {
-  return new Promise((resolve, reject) => {
+async function sendUnlockPacket(packet) {
+  return new Promise((resolve) => {
     const client = new net.Socket();
+    let resolved = false;
 
-    const BU_IP = "192.168.0.178"; // Replace with your actual BU IP
-    const BU_PORT = 4001;          // Replace with your actual BU port
+    client.setTimeout(3000); // 3s timeout
 
-    client.connect(BU_PORT, BU_IP, () => {
+    client.connect(4001, "192.168.0.178", () => {
       console.log("✅ Connected to BU. Sending unlock packet...");
-      console.log("📤 Packet:", packet.toString("hex").toUpperCase());
       client.write(packet);
     });
 
     client.on("data", (data) => {
-      console.log("📥 Response from BU:", data.toString("hex").toUpperCase());
-      client.destroy(); // close socket after receiving response
-      resolve(data);
+      if (!resolved) {
+        console.log(`📥 BU Response: ${data.toString("hex").toUpperCase()}`);
+        resolved = true;
+        resolve(data);
+      }
+      client.destroy();
+    });
+
+    client.on("timeout", () => {
+      if (!resolved) {
+        console.warn("⚠️ Connection timed out.");
+        resolved = true;
+        resolve(null);
+      }
+      client.destroy();
     });
 
     client.on("error", (err) => {
-      console.error("❌ TCP Error:", err.message);
+      if (!resolved) {
+        console.error(`❌ TCP Error: ${err.message}`);
+        resolved = true;
+        resolve(null);
+      }
       client.destroy();
-      reject(err);
     });
 
     client.on("close", () => {
-      console.log("🔌 Connection closed");
+      if (!resolved) {
+        console.warn("⚠️ Connection closed unexpectedly.");
+        resolved = true;
+        resolve(null);
+      }
     });
   });
 }
+
 
 
 function buildKerongStatusQueryPacket(compartmentId = 0x00) {
