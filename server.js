@@ -564,11 +564,11 @@ app.post("/api/locker/scan", express.text({ type: '*/*' }),async (req, res) => {
       });
     }
 
-    if (isBUConnected) {
+ 
     const packet = buildKerongUnlockPacket(parseInt(compartment.compartmentId)); // locker 1 = compartment 0
 console.log("📤 Final Packet:", packet.toString("hex").toUpperCase());
 await sendUnlockPacket(packet);
-    } 
+  
     // Lock the compartment
     compartment.isLocked = true;
     compartment.isBooked = true;
@@ -666,11 +666,11 @@ await sendUnlockPacket(packet);
     if (!compartment.isLocked) {
   return res.json({ success: false, message: "Compartment is already unlocked." });
 }
-if (isBUConnected) {
+
     const newpacket = buildKerongUnlockPacket(parseInt(compartment.compartmentId));
    
   await sendUnlockPacket(newpacket);
-}
+
 // If this is a MODIFY QR flow
 
 
