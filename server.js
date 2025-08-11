@@ -346,6 +346,8 @@ function connectToBU(ip = "192.168.0.178", port = 4001) {
   });
 }
 
+connectToBU();
+
 async function sendUnlockPacket(packet) {
   return new Promise((resolve) => {
     if (!isConnected || !client1) {
@@ -830,4 +832,3 @@ app.use((err, req, res, next) => {
 server.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
 });
-connectToBU();
