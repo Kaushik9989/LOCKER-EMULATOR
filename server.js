@@ -313,75 +313,55 @@ function parseKerongUnlockPacket(buffer) {
 }
 
 const net = require("net");
-// const TOTAL_LOCKERS = 2;
-
-
-
-// Global TCP client for BU
-let client1 = new net.Socket();
-let isBUConnected = false;
-
-// Connect once at server start
-function connectToBU() {
-  if (isBUConnected) return;
-
-  client1.connect(4001, "192.168.0.178", () => {
-    isBUConnected = true;
-    console.log("✅ Connected to BU (client1)");
-  });
-
-  client1.on("data", (data) => {
-    console.log(`📥 BU Response: ${data.toString("hex").toUpperCase()}`);
-  });
-
-  client1.on("error", (err) => {
-    console.error(`❌ BU TCP Error: ${err.message}`);
-    isBUConnected = false;
-  });
-
-  client1.on("close", () => {
-    console.warn("⚠️ BU Connection closed. Retrying in 5s...");
-    isBUConnected = false;
-    setTimeout(connectToBU, 5000);
-  });
-}
-
-// Call once when server starts
-connectToBU();
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+const TOTAL_LOCKERS = 2;
 async function sendUnlockPacket(packet) {
   return new Promise((resolve) => {
-    if (!isBUConnected || !client1 || client1.destroyed) {
-      console.warn("⚠️ BU is not connected. Cannot send packet.");
-      return resolve(null);
-    }
+    const client = new net.Socket();
+    let resolved = false;
 
-    client1.write(packet, (err) => {
-      if (err) {
-        console.error(`❌ Error sending packet: ${err.message}`);
-        return resolve(null);
+    client.setTimeout(3000); // 3s timeout
+
+    client.connect(4001, "192.168.0.178", () => {
+      console.log("✅ Connected to BU. Sending unlock packet...");
+      client.write(packet);
+    });
+
+    client.on("data", (data) => {
+      if (!resolved) {
+        console.log(`📥 BU Response: ${data.toString("hex").toUpperCase()}`);
+        resolved = true;
+        resolve(data);
       }
-      console.log(`📤 Sent Packet: ${packet.toString("hex").toUpperCase()}`);
-      resolve(true);
+      client.destroy();
+    });
+
+    client.on("timeout", () => {
+      if (!resolved) {
+        console.warn("⚠️ Connection timed out.");
+        resolved = true;
+        resolve(null);
+      }
+      client.destroy();
+    });
+
+    client.on("error", (err) => {
+      if (!resolved) {
+        console.error(`❌ TCP Error: ${err.message}`);
+        resolved = true;
+        resolve(null);
+      }
+      client.destroy();
+    });
+
+    client.on("close", () => {
+      if (!resolved) {
+        console.warn("⚠️ Connection closed unexpectedly.");
+        resolved = true;
+        resolve(null);
+      }
     });
   });
 }
-
 
 
 
@@ -564,11 +544,11 @@ app.post("/api/locker/scan", express.text({ type: '*/*' }),async (req, res) => {
       });
     }
 
-    if (isBUConnected) {
+    
     const packet = buildKerongUnlockPacket(parseInt(compartment.compartmentId)); // locker 1 = compartment 0
 console.log("📤 Final Packet:", packet.toString("hex").toUpperCase());
 await sendUnlockPacket(packet);
-    } 
+ 
     // Lock the compartment
     compartment.isLocked = true;
     compartment.isBooked = true;
@@ -666,11 +646,11 @@ await sendUnlockPacket(packet);
     if (!compartment.isLocked) {
   return res.json({ success: false, message: "Compartment is already unlocked." });
 }
-if (isBUConnected) {
+
     const newpacket = buildKerongUnlockPacket(parseInt(compartment.compartmentId));
    
   await sendUnlockPacket(newpacket);
-}
+
 // If this is a MODIFY QR flow
 
 
