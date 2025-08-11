@@ -318,7 +318,7 @@ const net = require("net");
 
 
 // Global TCP client for BU
-const net = require("net");
+
 
 let client1 = null;
 let isConnected = false;
@@ -624,9 +624,7 @@ app.post("/api/locker/scan", express.text({ type: '*/*' }),async (req, res) => {
       });
     }
 
-    (async () => {
-  const connected = await connectToBU(); // Connect once at start
-  if (!connected) return;
+   
 
   // Send packets only if connected
    const packet = buildKerongUnlockPacket(parseInt(compartment.compartmentId)); // locker 1 = compartment 0
@@ -635,7 +633,7 @@ await sendUnlockPacket(packet);
 
   // Close when you’re done
   closeBUConnection();
-})();
+
    
   
     // Lock the compartment
@@ -735,9 +733,7 @@ await sendUnlockPacket(packet);
     if (!compartment.isLocked) {
   return res.json({ success: false, message: "Compartment is already unlocked." });
 }
-  (async () => {
-  const connected = await connectToBU(); // Connect once at start
-  if (!connected) return;
+
 
   // Send packets only if connected
  const newpacket = buildKerongUnlockPacket(parseInt(compartment.compartmentId));
@@ -746,7 +742,6 @@ await sendUnlockPacket(packet);
 
   // Close when you’re done
   closeBUConnection();
-})();
 
     
 
@@ -835,3 +830,4 @@ app.use((err, req, res, next) => {
 server.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
 });
+connectToBU();
